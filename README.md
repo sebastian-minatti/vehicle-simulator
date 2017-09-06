@@ -31,3 +31,9 @@ And then go to http://localhost:9000 to see the running web application.
 
   Shows how to use Guice to bind all the components needed by your application.
 
+## Things to do
+
+- Implement a Message Service like (ActiveMQ)
+
+- Error handling
+

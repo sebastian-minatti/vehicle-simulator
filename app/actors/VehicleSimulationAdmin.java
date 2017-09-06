@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -17,20 +16,21 @@ import akka.actor.*;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.util.Timeout;
-import scala.compat.java8.FutureConverters;
 import scala.concurrent.ExecutionContext;
+import scala.concurrent.Future;
 import model.schema.Car;
+import play.libs.akka.InjectedActorSupport;
 import factory.CarFactory;
 import factory.Factory;
 
 import static akka.pattern.Patterns.ask;
-import static play.libs.Json.toJson;
+import static akka.pattern.Patterns.pipe;
 
 /**
  * Create actors for vehicle simulation and manage them.
  *
  */
-public class VehicleSimulationAdmin extends AbstractActor {
+public class VehicleSimulationAdmin extends AbstractActor  implements InjectedActorSupport {
 
 	private final LoggingAdapter logger = Logging.getLogger(getContext().system(), this);	
 
@@ -86,13 +86,19 @@ public class VehicleSimulationAdmin extends AbstractActor {
 				})
 				.match(Update.class, update -> {
 					logger.info("Received message {}", update);
-					
-					CompletableFuture<ActorRef> future = CompletableFuture.supplyAsync(() -> update(update));
-					
-					// could fail for nullpointer exception
-				    future.thenApplyAsync( actor -> ask(actor, update, timeout) )
-					      .thenAccept( response -> sender().tell(response, self()));					
+					 
+					try {
+						ActorRef actor = getActor(update.getId());
+						
+						Future<Object> future = ask(actor, update, timeout);
+					    
+					    pipe(future, executionContext).to(sender());
 
+					} catch(NullPointerException nex){
+						sender().tell(new ExceptionResponse(nex.getMessage()), self());
+					} catch(IllegalArgumentException ilex) {
+						sender().tell(new ExceptionResponse(ilex.getMessage()), self());
+					}					
 				}).build();
 	}
 	
@@ -122,7 +128,13 @@ public class VehicleSimulationAdmin extends AbstractActor {
 	/**
 	 * Retrieve the correct actor. 
 	 */
-	private ActorRef update(Update msg) throws NullPointerException{		
-		return this.vehicles.get(msg.getId());
+	private ActorRef getActor(UUID vehicleId ){
+		ActorRef actor = this.vehicles.get(vehicleId);
+		
+	    if(actor == null){
+			throw new IllegalArgumentException("Vehicle not found");
+		}
+		
+		return actor;
 	}
 }

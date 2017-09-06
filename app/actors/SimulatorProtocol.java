@@ -156,4 +156,22 @@ public class SimulatorProtocol {
 			return getClass().getName();
 		}		
 	}
+	
+	public static final class ExceptionResponse {
+		private final String msg;
+		
+		public ExceptionResponse(final String msg){
+			this.msg = msg;
+		}
+
+		public String getMsg() {
+			return msg;
+		}
+		
+		@Override
+		public String toString() {
+			return "Exception found: " + getClass().getName() + 
+					" due to: " + msg;
+		}
+	}
 }
